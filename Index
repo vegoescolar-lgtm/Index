@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SISTEMA VEGO - Escáner Externo</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; background: #f4f7f9; }
+    #reader { width: 350px; margin: auto; border-radius: 15px; overflow: hidden; }
+    .status { margin-top: 20px; font-weight: bold; padding: 15px; border-radius: 8px; display: inline-block; }
+    .success { background: #d4edda; color: #155724; }
+    .error { background: #f8d7da; color: #721c24; }
+  </style>
+</head>
+<body>
+  <h2>SISTEMA VEGO: ESCÁNER EXTERNO</h2>
+  <div id="reader"></div>
+  <div id="status" class="status">Esperando cámara...</div>
+
+  <script>
+    // PEGA AQUÍ LA URL DE TU IMPLEMENTACIÓN DE GOOGLE (la que termina en /exec)
+    const WEB_APP_URL = "TU_URL_AQUÍ";
+
+    const html5QrCode = new Html5Qrcode("reader");
+    
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      (decodedText) => {
+        document.getElementById('status').innerText = "Enviando: " + decodedText;
+        enviarAGoogle(decodedText);
+      }
+    ).catch(err => alert("Error de cámara: " + err));
+
+    function enviarAGoogle(id) {
+      // Usamos el modo 'no-cors' para evitar bloqueos simples o manejamos el POST
+      fetch(WEB_APP_URL, {
+        method: 'POST',
+        mode: 'no-cors', // Importante para Google Apps Script desde fuera
+        cache: 'no-cache',
+        body: JSON.stringify({id: id})
+      })
+      .then(() => {
+        document.getElementById('status').innerText = "✅ Registrado: " + id;
+        document.getElementById('status').className = "status success";
+      })
+      .catch(err => {
+        document.getElementById('status').innerText = "❌ Error de conexión";
+        document.getElementById('status').className = "status error";
+      });
+    }
+  </script>
+</body>
+</html>
