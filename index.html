@@ -69,31 +69,42 @@
     }
   }
 
-  function enviarDatosGoogle(codigo) {
-    const status = document.getElementById('status');
-    status.innerText = "⌛ Registrando ID: " + codigo;
-    status.style.background = "#fff9c4";
+function enviarDatosGoogle(lecturaQR) {
+  const status = document.getElementById('status');
+  let idFinal = lecturaQR;
 
-    // NOTA: Esta es la conexión POST hacia tu hoja "Asistencia"
-    fetch(URL_SERVIDOR_VEGO, {
-      method: "POST",
-      mode: "no-cors", 
-      body: JSON.stringify({ id: codigo })
-    })
-    .then(() => {
-      status.style.background = "#c8e6c9";
-      status.innerText = "✅ REGISTRADO CON ÉXITO";
-      // El sistema vuelve a esperar después de 2 segundos
-      setTimeout(() => { 
-        status.innerText = "Esperando lectura..."; 
-        status.style.background = "#eee";
-      }, 2000);
-    })
-    .catch(err => {
-      status.innerText = "❌ ERROR DE ENVÍO";
-      status.style.background = "#ffcdd2";
-    });
+  // Si el QR es una URL larga, extraemos solo el ID
+  if (lecturaQR.includes("id=")) {
+    const params = new URLSearchParams(lecturaQR.split('?')[1]);
+    idFinal = params.get("id");
+    
+    // Opcional: Mostrar el nombre que viene en el QR inmediatamente
+    const nombreQR = params.get("nombre") || "Alumno";
+    status.innerText = "⌛ Registrando a: " + nombreQR;
+  } else {
+    status.innerText = "⌛ Registrando ID: " + lecturaQR;
   }
+
+  status.style.background = "#fff9c4";
+
+  // Enviamos solo el ID limpio a tu Google Sheets
+  fetch(URL_SERVIDOR_VEGO, {
+    method: "POST",
+    mode: "no-cors", 
+    body: JSON.stringify({ id: idFinal })
+  })
+  .then(() => {
+    status.style.background = "#c8e6c9";
+    status.innerText = "✅ ASISTENCIA REGISTRADA";
+    setTimeout(() => { 
+      status.innerText = "Esperando lectura..."; 
+      status.style.background = "#eee";
+    }, 2000);
+  })
+  .catch(err => {
+    status.innerText = "❌ ERROR DE CONEXIÓN";
+  });
+}
 
   function registrarFisico() {
     const input = document.getElementById('txtFisico');
