@@ -1,53 +1,107 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>SISTEMA VEGO - Escáner Externo</title>
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SISTEMA VEGO - Panel Externo</title>
   <style>
-    body { font-family: sans-serif; text-align: center; background: #f4f7f9; }
-    #reader { width: 350px; margin: auto; border-radius: 15px; overflow: hidden; }
-    .status { margin-top: 20px; font-weight: bold; padding: 15px; border-radius: 8px; display: inline-block; }
-    .success { background: #d4edda; color: #155724; }
-    .error { background: #f8d7da; color: #721c24; }
+    body { font-family: 'Segoe UI', sans-serif; background: #e9ecef; padding: 15px; text-align: center; }
+    .container { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 8px solid #1e88e5; }
+    .metodo-card { border: 2px solid #1e88e5; border-radius: 10px; margin-bottom: 15px; padding: 15px; background: #f8fbff; }
+    #reader { width: 100%; border-radius: 8px; background: #000; min-height: 250px; display: none; }
+    .btn-activar-cam { background: #1e88e5; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; font-size: 16px; }
+    #status { margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: bold; background: #eee; transition: 0.3s; }
   </style>
 </head>
 <body>
-  <h2>SISTEMA VEGO: ESCÁNER EXTERNO</h2>
-  <div id="reader"></div>
-  <div id="status" class="status">Esperando cámara...</div>
 
-  <script>
-    // PEGA AQUÍ LA URL DE TU IMPLEMENTACIÓN DE GOOGLE (la que termina en /exec)
-    const WEB_APP_URL = "TU_URL_AQUÍ";
+<div class="container">
+  <h2>SISTEMA VEGO</h2>
+  <p><strong>Base de Datos:</strong> Tacaton 2.0</p>
+  
+  <div class="metodo-card">
+    <strong>📷 CÁMARA (QR)</strong>
+    <button id="btnCamara" class="btn-activar-cam" onclick="forzarInicioCamara()">▶️ INICIAR ESCÁNER</button>
+    <div id="reader"></div>
+  </div>
 
-    const html5QrCode = new Html5Qrcode("reader");
-    
-    html5QrCode.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: 250 },
-      (decodedText) => {
-        document.getElementById('status').innerText = "Enviando: " + decodedText;
-        enviarAGoogle(decodedText);
-      }
-    ).catch(err => alert("Error de cámara: " + err));
+  <div class="metodo-card" style="border-color: #2e7d32; background: #f1f8e9;">
+    <strong>🔌 ESCÁNER USB / MANUAL</strong>
+    <input type="text" id="txtFisico" style="width:90%; padding:10px; border-radius:5px; border:1px solid #ccc;" placeholder="Escanee o escriba ID..." onkeypress="if(event.key === 'Enter') registrarFisico()">
+  </div>
 
-    function enviarAGoogle(id) {
-      // Usamos el modo 'no-cors' para evitar bloqueos simples o manejamos el POST
-      fetch(WEB_APP_URL, {
-        method: 'POST',
-        mode: 'no-cors', // Importante para Google Apps Script desde fuera
-        cache: 'no-cache',
-        body: JSON.stringify({id: id})
-      })
-      .then(() => {
-        document.getElementById('status').innerText = "✅ Registrado: " + id;
-        document.getElementById('status').className = "status success";
-      })
-      .catch(err => {
-        document.getElementById('status').innerText = "❌ Error de conexión";
-        document.getElementById('status').className = "status error";
-      });
+  <div id="status">Esperando lectura...</div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<script>
+  /* ===========================================================
+     NOTA DE CONEXIÓN:
+     Copia la URL de "Implementación" de tu Google Apps Script 
+     y pégala aquí abajo entre las comillas.
+     =========================================================== */
+  const URL_SERVIDOR_VEGO = "https://script.google.com/macros/s/AKfycbw6D8yeIRAjTO1u8us8p7EdUbqQSR2D6HruXJdkM8AS43R3EfkytdPF-TCg-parmDz0ew/exec"; 
+
+  let html5QrCode = null;
+
+  async function forzarInicioCamara() {
+    const btn = document.getElementById('btnCamara');
+    const readerDiv = document.getElementById('reader');
+    btn.innerText = "⌛ Accediendo...";
+    readerDiv.style.display = "block";
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      stream.getTracks().forEach(track => track.stop());
+
+      html5QrCode = new Html5Qrcode("reader");
+      await html5QrCode.start(
+        { facingMode: "environment" }, 
+        { fps: 20, qrbox: 250 },
+        (text) => { enviarDatosGoogle(text); }
+      );
+      btn.style.display = "none";
+      document.getElementById('status').innerText = "✅ Cámara conectada";
+    } catch (err) {
+      alert("Error de cámara: " + err);
+      btn.innerText = "❌ REINTENTAR";
     }
-  </script>
+  }
+
+  function enviarDatosGoogle(codigo) {
+    const status = document.getElementById('status');
+    status.innerText = "⌛ Registrando ID: " + codigo;
+    status.style.background = "#fff9c4";
+
+    // NOTA: Esta es la conexión POST hacia tu hoja "Asistencia"
+    fetch(URL_SERVIDOR_VEGO, {
+      method: "POST",
+      mode: "no-cors", 
+      body: JSON.stringify({ id: codigo })
+    })
+    .then(() => {
+      status.style.background = "#c8e6c9";
+      status.innerText = "✅ REGISTRADO CON ÉXITO";
+      // El sistema vuelve a esperar después de 2 segundos
+      setTimeout(() => { 
+        status.innerText = "Esperando lectura..."; 
+        status.style.background = "#eee";
+      }, 2000);
+    })
+    .catch(err => {
+      status.innerText = "❌ ERROR DE ENVÍO";
+      status.style.background = "#ffcdd2";
+    });
+  }
+
+  function registrarFisico() {
+    const input = document.getElementById('txtFisico');
+    if(input.value.trim() !== "") {
+      enviarDatosGoogle(input.value);
+      input.value = "";
+    }
+  }
+</script>
 </body>
 </html>
