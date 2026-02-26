@@ -41,7 +41,7 @@
      Copia la URL de "Implementación" de tu Google Apps Script 
      y pégala aquí abajo entre las comillas.
      =========================================================== */
-  const URL_SERVIDOR_VEGO = "https://script.google.com/macros/s/AKfycbx_JsKiDzGRkYCtGggzHxgki6DGvmIKsKhZtvMbo3XnPZWt8KoXot7F4RCNHG8AJSe_CQ/exec"; 
+  const URL_SERVIDOR_VEGO = "https://script.google.com/macros/s/AKfycbwfeHAG1GMxW68kqp8d2yTHLD5eaarYdo1eFABVo6ghAuY0bidQoD09eXTnkTGsjpZ5Sw/exec"; 
 
   let html5QrCode = null;
 
@@ -73,37 +73,47 @@ function enviarDatosGoogle(lecturaQR) {
   const status = document.getElementById('status');
   let idFinal = lecturaQR;
 
-  // Si el QR es una URL larga, extraemos solo el ID
+  // EXTRACCIÓN RÁPIDA DE ID
   if (lecturaQR.includes("id=")) {
-    const params = new URLSearchParams(lecturaQR.split('?')[1]);
-    idFinal = params.get("id");
-    
-    // Opcional: Mostrar el nombre que viene en el QR inmediatamente
-    const nombreQR = params.get("nombre") || "Alumno";
-    status.innerText = "⌛ Registrando a: " + nombreQR;
-  } else {
-    status.innerText = "⌛ Registrando ID: " + lecturaQR;
+    idFinal = lecturaQR.split("id=")[1].split("&")[0];
   }
 
+  status.innerText = "⚡ PROCESANDO...";
   status.style.background = "#fff9c4";
 
-  // Enviamos solo el ID limpio a tu Google Sheets
+  // ENVIAMOS EL ID + EL USUARIO QUE ESCANEA
   fetch(URL_SERVIDOR_VEGO, {
     method: "POST",
     mode: "no-cors", 
-    body: JSON.stringify({ id: idFinal })
+    body: JSON.stringify({ 
+      id: idFinal,
+      usuario: USUARIO_REGISTRA // <-- AQUÍ ENVIAMOS EL CORREO/NOMBRE
+    })
   })
   .then(() => {
     status.style.background = "#c8e6c9";
-    status.innerText = "✅ ASISTENCIA REGISTRADA";
+    status.innerText = "✅ REGISTRADO: " + idFinal;
+    // Volver a esperar más rápido (1 segundo)
     setTimeout(() => { 
       status.innerText = "Esperando lectura..."; 
       status.style.background = "#eee";
-    }, 2000);
-  })
-  .catch(err => {
-    status.innerText = "❌ ERROR DE CONEXIÓN";
+    }, 1000);
   });
+}
+
+// 2. CONFIGURACIÓN DE CÁMARA ULTRA RÁPIDA
+async function forzarInicioCamara() {
+  // ... (tus variables de botones)
+  html5QrCode = new Html5Qrcode("reader");
+  await html5QrCode.start(
+    { facingMode: "environment" }, 
+    { 
+      fps: 30,             // Aumentamos a 30fps para que sea fluido
+      qrbox: { width: 200, height: 200 }, // Caja más pequeña = enfoque más rápido
+      aspectRatio: 1.0     // Evita deformaciones
+    },
+    (text) => { enviarDatosGoogle(text); }
+  );
 }
 
   function registrarFisico() {
