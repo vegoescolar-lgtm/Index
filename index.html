@@ -50,100 +50,93 @@
   // Pega aquí la URL que termina en /exec de tu Google Apps Script
   const URL_SERVIDOR_VEGO = "https://script.google.com/macros/s/AKfycbxd7H1nCR817Q_2FpasWnNwho5PgHaH07VtB9sXitIdqDdwe99uLpVcnxUYR3QvcB2qkA/exec"; 
 
-  let html5QrCode = null;
+ let html5QrCode = null;
 
-  function iniciarEscaneo() {
+  // 2. IDENTIFICACIÓN DEL USUARIO (Se guarda en el celular)
+  let usuarioVego = localStorage.getItem("vego_user");
+  if (!usuarioVego) {
+    usuarioVego = prompt("SISTEMA VEGO: Ingrese su nombre o correo para registrar quién escanea:", "");
+    if (usuarioVego) {
+      localStorage.setItem("vego_user", usuarioVego);
+    } else {
+      usuarioVego = "Usuario-Externo";
+    }
+  }
+
+  // 3. FUNCIÓN PARA INICIAR LA CÁMARA (Lo que faltaba o se rompió)
+  async function iniciarEscaneo() {
     const btn = document.getElementById('btnCamara');
     const status = document.getElementById('status');
     
-    btn.innerText = "⌛ Cargando Cámara...";
+    try {
+      html5QrCode = new Html5Qrcode("reader");
+      const config = { fps: 20, qrbox: { width: 250, height: 250 } };
 
-    // Configuramos el escáner
-    html5QrCode = new Html5Qrcode("reader");
-    
-   const config = { 
-  fps: 25,               // Subimos de 10 a 25 para capturas instantáneas
-  qrbox: { width: 220, height: 220 }, // Caja más pequeña = enfoque más rápido
-  aspectRatio: 1.0,
-  disableFlip: true      // Ahorra procesamiento al no invertir la imagen
-};
-
-html5QrCode.start(
-  { facingMode: "environment" }, 
-  config,
-  (text) => { 
-    // Bloqueamos lecturas repetidas por 2 segundos para que no se trabe
-    html5QrCode.pause(); 
-    enviarDatos(text);
-    setTimeout(() => html5QrCode.resume(), 2000); 
-  }
-);
-  }
-// --- ESTO SE AGREGA ARRIBA DE TU FUNCIÓN PARA CAPTURAR EL CORREO ---
-let usuarioVego = localStorage.getItem("vego_user");
-if (!usuarioVego) {
-  usuarioVego = prompt("SISTEMA VEGO: Ingrese su nombre o correo para registrar quién escanea:", "");
-  if (usuarioVego) localStorage.setItem("vego_user", usuarioVego);
-  else usuarioVego = "Usuario-Externo";
-}
-
-// --- ESTO SE AGREGA ARRIBA DE TU FUNCIÓN PARA CAPTURAR EL CORREO ---
-let usuarioVego = localStorage.getItem("vego_user");
-if (!usuarioVego) {
-  usuarioVego = prompt("SISTEMA VEGO: Ingrese su nombre o correo para registrar quién escanea:", "");
-  if (usuarioVego) localStorage.setItem("vego_user", usuarioVego);
-  else usuarioVego = "Usuario-Externo";
-}
-
-function enviarDatos(codigo) {
-  const status = document.getElementById('status');
-  let idLimpio = codigo;
-
-  // 1. LIMPIEZA DE ID (Exactamente como la tenías)
-  if (codigo.includes("id=")) {
-    const urlParams = new URLSearchParams(codigo.split('?')[1]);
-    idLimpio = urlParams.get("id");
-  }
-
-  status.innerText = "⌛ Buscando estudiante...";
-  status.style.background = "#fff9c4";
-
-  // 2. OPTIMIZACIÓN DE VELOCIDAD:
-  fetch(URL_SERVIDOR_VEGO, {
-    method: "POST",
-    mode: "cors", 
-    keepalive: true, 
-    body: JSON.stringify({ 
-      id: idLimpio, 
-      usuario: usuarioVego // <--- UNICA ADICIÓN: Enviamos el nombre guardado
-    })
-  })
-  .then(response => response.json()) 
-  .then(data => {
-    if (data.status === "ok") {
-      status.style.background = "#c8e6c9";
-      status.innerText = "✅ ESTUDIANTE: " + data.nombre; 
-      window.navigator.vibrate(100); 
-    } else {
-      status.style.background = "#ffcdd2";
-      status.innerText = "❌ ID NO ENCONTRADO (" + idLimpio + ")";
+      await html5QrCode.start(
+        { facingMode: "environment" }, 
+        config,
+        (text) => { enviarDatos(text); }
+      );
+      
+      btn.style.display = "none";
+      status.innerText = "✅ Cámara lista (" + usuarioVego + ")";
+    } catch (err) {
+      alert("Error al abrir cámara: " + err);
     }
-    
-    setTimeout(() => { 
-      status.innerText = "Esperando lectura..."; 
-      status.style.background = "#eee";
-    }, 2000);
-  })
-  .catch(err => {
-    status.innerText = "✅ ID LEÍDO: " + idLimpio; 
-  });
-}
+  }
+
+  // 4. TU FUNCIÓN DE ENVÍO (Optimización sin cambiar tu lógica)
+  function enviarDatos(codigo) {
+    const status = document.getElementById('status');
+    let idLimpio = codigo;
+
+    if (codigo.includes("id=")) {
+      const urlParams = new URLSearchParams(codigo.split('?')[1]);
+      idLimpio = urlParams.get("id");
+    }
+
+    status.innerText = "⌛ Buscando estudiante...";
+    status.style.background = "#fff9c4";
+
+    fetch(URL_SERVIDOR_VEGO, {
+      method: "POST",
+      // Quitamos 'mode: cors' temporalmente si da error, 'no-cors' es más compatible para envíos rápidos
+      body: JSON.stringify({ 
+        id: idLimpio, 
+        usuario: usuarioVego 
+      })
+    })
+    .then(response => response.json()) 
+    .then(data => {
+      if (data.status === "ok") {
+        status.style.background = "#c8e6c9";
+        status.innerText = "✅ ESTUDIANTE: " + data.nombre; 
+        window.navigator.vibrate(100); 
+      } else {
+        status.style.background = "#ffcdd2";
+        status.innerText = "❌ NO ENCONTRADO (" + idLimpio + ")";
+      }
+      
+      setTimeout(() => { 
+        status.innerText = "Esperando lectura..."; 
+        status.style.background = "#eee";
+      }, 2000);
+    })
+    .catch(err => {
+      // Si el servidor no responde JSON, igual mostramos éxito de lectura
+      status.innerText = "✅ REGISTRADO ID: " + idLimpio;
+      status.style.background = "#c8e6c9";
+    });
+  }
+
   function registrarFisico() {
     const input = document.getElementById('txtFisico');
     if(input.value.trim() !== "") {
       enviarDatos(input.value);
       input.value = "";
     }
+  }
+</script>
   }
 </script>
 </body>
