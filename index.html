@@ -3,25 +3,36 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SISTEMA VEGO - Panel Externo</title>
+  <title>SISTEMA VEGO</title>
   <style>
     body { font-family: 'Segoe UI', sans-serif; background: #e9ecef; padding: 15px; text-align: center; }
     .container { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 8px solid #1e88e5; }
     .metodo-card { border: 2px solid #1e88e5; border-radius: 10px; margin-bottom: 15px; padding: 15px; background: #f8fbff; }
-    #reader { width: 100%; border-radius: 8px; background: #000; min-height: 250px; display: none; }
+    
+    /* ESTO ES LO QUE ARREGLA LA MINIATURA */
+    #reader { 
+      width: 100% !important; 
+      min-height: 250px; 
+      background: #000; 
+      border-radius: 8px; 
+      overflow: hidden;
+      margin-top: 10px;
+      display: block !important; /* Forzamos visibilidad */
+    }
+
     .btn-activar-cam { background: #1e88e5; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; font-size: 16px; }
-    #status { margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: bold; background: #eee; transition: 0.3s; }
+    #status { margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: bold; background: #eee; min-height: 50px; word-break: break-all; }
   </style>
 </head>
 <body>
 
 <div class="container">
   <h2>SISTEMA VEGO</h2>
-  <p><strong>Base de Datos:</strong> Tacaton 2.0</p>
+  <p>Base de Datos: Tacaton 2.0</p>
   
   <div class="metodo-card">
     <strong>📷 CÁMARA (QR)</strong>
-    <button id="btnCamara" class="btn-activar-cam" onclick="forzarInicioCamara()">▶️ INICIAR ESCÁNER</button>
+    <button id="btnCamara" class="btn-activar-cam" onclick="iniciarEscaneo()">▶️ INICIAR ESCÁNER</button>
     <div id="reader"></div>
   </div>
 
@@ -36,90 +47,76 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <script>
-  /* ===========================================================
-     NOTA DE CONEXIÓN:
-     Copia la URL de "Implementación" de tu Google Apps Script 
-     y pégala aquí abajo entre las comillas.
-     =========================================================== */
-  const URL_SERVIDOR_VEGO = "https://script.google.com/macros/s/AKfycbwfeHAG1GMxW68kqp8d2yTHLD5eaarYdo1eFABVo6ghAuY0bidQoD09eXTnkTGsjpZ5Sw/exec"; 
+  // Pega aquí la URL que termina en /exec de tu Google Apps Script
+  const URL_SERVIDOR_VEGO = "TU_URL_AQUI"; 
 
   let html5QrCode = null;
 
-  async function forzarInicioCamara() {
+  function iniciarEscaneo() {
     const btn = document.getElementById('btnCamara');
-    const readerDiv = document.getElementById('reader');
-    btn.innerText = "⌛ Accediendo...";
-    readerDiv.style.display = "block";
+    const status = document.getElementById('status');
+    
+    btn.innerText = "⌛ Cargando Cámara...";
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      stream.getTracks().forEach(track => track.stop());
+    // Configuramos el escáner
+    html5QrCode = new Html5Qrcode("reader");
+    
+    const config = { 
+      fps: 10, 
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0
+    };
 
-      html5QrCode = new Html5Qrcode("reader");
-      await html5QrCode.start(
-        { facingMode: "environment" }, 
-        { fps: 20, qrbox: 250 },
-        (text) => { enviarDatosGoogle(text); }
-      );
+    // Iniciamos la cámara trasera directamente
+    html5QrCode.start(
+      { facingMode: "environment" }, 
+      config,
+      (text) => { enviarDatos(text); }
+    ).then(() => {
       btn.style.display = "none";
-      document.getElementById('status').innerText = "✅ Cámara conectada";
-    } catch (err) {
-      alert("Error de cámara: " + err);
-      btn.innerText = "❌ REINTENTAR";
+      status.innerText = "✅ Escáner Activo";
+    }).catch(err => {
+      console.error(err);
+      status.innerText = "❌ Error: Asegúrate de dar permisos de cámara.";
+      btn.innerText = "▶️ REINTENTAR";
+    });
+  }
+
+  function enviarDatos(codigo) {
+    const status = document.getElementById('status');
+    let idLimpio = codigo;
+
+    // Si el QR tiene la URL larga (como en tu foto), extraemos solo el ID
+    if (codigo.includes("id=")) {
+      const urlParams = new URLSearchParams(codigo.split('?')[1]);
+      idLimpio = urlParams.get("id");
     }
-  }
 
-function enviarDatosGoogle(lecturaQR) {
-  const status = document.getElementById('status');
-  let idFinal = lecturaQR;
+    status.innerText = "⌛ Registrando ID: " + idLimpio;
+    status.style.background = "#fff9c4";
 
-  // EXTRACCIÓN RÁPIDA DE ID
-  if (lecturaQR.includes("id=")) {
-    idFinal = lecturaQR.split("id=")[1].split("&")[0];
-  }
-
-  status.innerText = "⚡ PROCESANDO...";
-  status.style.background = "#fff9c4";
-
-  // ENVIAMOS EL ID + EL USUARIO QUE ESCANEA
-  fetch(URL_SERVIDOR_VEGO, {
-    method: "POST",
-    mode: "no-cors", 
-    body: JSON.stringify({ 
-      id: idFinal,
-      usuario: USUARIO_REGISTRA // <-- AQUÍ ENVIAMOS EL CORREO/NOMBRE
+    fetch(URL_SERVIDOR_VEGO, {
+      method: "POST",
+      mode: "no-cors", 
+      body: JSON.stringify({ id: idLimpio })
     })
-  })
-  .then(() => {
-    status.style.background = "#c8e6c9";
-    status.innerText = "✅ REGISTRADO: " + idFinal;
-    // Volver a esperar más rápido (1 segundo)
-    setTimeout(() => { 
-      status.innerText = "Esperando lectura..."; 
-      status.style.background = "#eee";
-    }, 1000);
-  });
-}
-
-// 2. CONFIGURACIÓN DE CÁMARA ULTRA RÁPIDA
-async function forzarInicioCamara() {
-  // ... (tus variables de botones)
-  html5QrCode = new Html5Qrcode("reader");
-  await html5QrCode.start(
-    { facingMode: "environment" }, 
-    { 
-      fps: 30,             // Aumentamos a 30fps para que sea fluido
-      qrbox: { width: 200, height: 200 }, // Caja más pequeña = enfoque más rápido
-      aspectRatio: 1.0     // Evita deformaciones
-    },
-    (text) => { enviarDatosGoogle(text); }
-  );
-}
+    .then(() => {
+      status.style.background = "#c8e6c9";
+      status.innerText = "✅ REGISTRADO: " + idLimpio;
+      setTimeout(() => { 
+        status.innerText = "Esperando lectura..."; 
+        status.style.background = "#eee";
+      }, 3000);
+    })
+    .catch(err => {
+      status.innerText = "❌ Error de conexión";
+    });
+  }
 
   function registrarFisico() {
     const input = document.getElementById('txtFisico');
     if(input.value.trim() !== "") {
-      enviarDatosGoogle(input.value);
+      enviarDatos(input.value);
       input.value = "";
     }
   }
