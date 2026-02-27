@@ -6,29 +6,26 @@
   <title>SISTEMA VEGO</title>
   <style>
     body { font-family: 'Segoe UI', sans-serif; background: #e9ecef; padding: 15px; text-align: center; }
-    .container { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 8px solid #1e88e5; }
+    /* El contenedor principal empieza oculto por seguridad */
+    .container { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 8px solid #1e88e5; display: none; } 
     .metodo-card { border: 2px solid #1e88e5; border-radius: 10px; margin-bottom: 15px; padding: 15px; background: #f8fbff; }
-    
-    /* ESTO ES LO QUE ARREGLA LA MINIATURA */
-    #reader { 
-      width: 100% !important; 
-      min-height: 250px; 
-      background: #000; 
-      border-radius: 8px; 
-      overflow: hidden;
-      margin-top: 10px;
-      display: block !important; /* Forzamos visibilidad */
-    }
-
+    #reader { width: 100% !important; min-height: 250px; background: #000; border-radius: 8px; overflow: hidden; margin-top: 10px; display: block !important; }
     .btn-activar-cam { background: #1e88e5; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; font-size: 16px; }
     #status { margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: bold; background: #eee; min-height: 50px; word-break: break-all; }
+    #bloqueo-msg { margin-top: 50px; color: #666; }
   </style>
 </head>
 <body>
 
-<div class="container">
+<div id="bloqueo-msg">
+  <h2>SISTEMA VEGO</h2>
+  <p>Verificando credenciales...</p>
+</div>
+
+<div class="container" id="appContent">
   <h2>SISTEMA VEGO</h2>
   <p>Base de Datos: Tacaton 2.0</p>
+  <p id="docenteActivo" style="color: #1e88e5; font-weight: bold;"></p>
   
   <div class="metodo-card">
     <strong>📷 CÁMARA (QR)</strong>
@@ -47,23 +44,39 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <script>
-  // Pega aquí la URL que termina en /exec de tu Google Apps Script
   const URL_SERVIDOR_VEGO = "https://script.google.com/macros/s/AKfycbxd7H1nCR817Q_2FpasWnNwho5PgHaH07VtB9sXitIdqDdwe99uLpVcnxUYR3QvcB2qkA/exec"; 
+  let html5QrCode = null;
+  let usuarioVego = "";
 
- let html5QrCode = null;
-
-  // 2. IDENTIFICACIÓN DEL USUARIO (Se guarda en el celular)
-  let usuarioVego = localStorage.getItem("vego_user");
-  if (!usuarioVego) {
-    usuarioVego = prompt("SISTEMA VEGO: Ingrese su nombre o correo para registrar quién escanea:", "");
-    if (usuarioVego) {
-      localStorage.setItem("vego_user", usuarioVego);
-    } else {
-      usuarioVego = "Usuario-Externo";
+  // 1. VALIDACIÓN DE USUARIO AL CARGAR
+  window.onload = async function() {
+    const idDocente = prompt("SISTEMA VEGO: Ingrese su ID de Docente para acceder:");
+    
+    if (!idDocente) {
+      document.getElementById('bloqueo-msg').innerHTML = "<h2>🚫 Acceso Denegado</h2><p>Se requiere un ID válido.</p>";
+      return;
     }
-  }
 
-  // 3. FUNCIÓN PARA INICIAR LA CÁMARA (Lo que faltaba o se rompió)
+    try {
+      // Llamamos al servidor para validar contra la hoja "Scaner"
+      const resp = await fetch(URL_SERVIDOR_VEGO + "?modo=validar&id=" + idDocente);
+      const data = await resp.json();
+
+      if (data.autorizado) {
+        usuarioVego = data.nombre;
+        document.getElementById('bloqueo-msg').style.display = "none";
+        document.getElementById('appContent').style.display = "block";
+        document.getElementById('docenteActivo').innerText = "👤 Docente: " + usuarioVego;
+      } else {
+        alert("ID de Docente no reconocido.");
+        document.getElementById('bloqueo-msg').innerHTML = "<h2>❌ ID No Autorizado</h2>";
+      }
+    } catch (e) {
+      alert("Error de conexión con Tacaton 2.0");
+    }
+  };
+
+  // 2. FUNCIÓN PARA INICIAR LA CÁMARA
   async function iniciarEscaneo() {
     const btn = document.getElementById('btnCamara');
     const status = document.getElementById('status');
@@ -79,13 +92,13 @@
       );
       
       btn.style.display = "none";
-      status.innerText = "✅ Cámara lista (" + usuarioVego + ")";
+      status.innerText = "✅ Cámara lista";
     } catch (err) {
       alert("Error al abrir cámara: " + err);
     }
   }
 
-  // 4. TU FUNCIÓN DE ENVÍO (Optimización sin cambiar tu lógica)
+  // 3. FUNCIÓN DE ENVÍO
   function enviarDatos(codigo) {
     const status = document.getElementById('status');
     let idLimpio = codigo;
@@ -100,7 +113,6 @@
 
     fetch(URL_SERVIDOR_VEGO, {
       method: "POST",
-      // Quitamos 'mode: cors' temporalmente si da error, 'no-cors' es más compatible para envíos rápidos
       body: JSON.stringify({ 
         id: idLimpio, 
         usuario: usuarioVego 
@@ -123,7 +135,6 @@
       }, 2000);
     })
     .catch(err => {
-      // Si el servidor no responde JSON, igual mostramos éxito de lectura
       status.innerText = "✅ REGISTRADO ID: " + idLimpio;
       status.style.background = "#c8e6c9";
     });
@@ -135,8 +146,6 @@
       enviarDatos(input.value);
       input.value = "";
     }
-  }
-</script>
   }
 </script>
 </body>
