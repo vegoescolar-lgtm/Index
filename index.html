@@ -61,32 +61,30 @@
     // Configuramos el escáner
     html5QrCode = new Html5Qrcode("reader");
     
-    const config = { 
-      fps: 10, 
-      qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.0
-    };
+   const config = { 
+  fps: 25,               // Subimos de 10 a 25 para capturas instantáneas
+  qrbox: { width: 220, height: 220 }, // Caja más pequeña = enfoque más rápido
+  aspectRatio: 1.0,
+  disableFlip: true      // Ahorra procesamiento al no invertir la imagen
+};
 
-    // Iniciamos la cámara trasera directamente
-    html5QrCode.start(
-      { facingMode: "environment" }, 
-      config,
-      (text) => { enviarDatos(text); }
-    ).then(() => {
-      btn.style.display = "none";
-      status.innerText = "✅ Escáner Activo";
-    }).catch(err => {
-      console.error(err);
-      status.innerText = "❌ Error: Asegúrate de dar permisos de cámara.";
-      btn.innerText = "▶️ REINTENTAR";
-    });
+html5QrCode.start(
+  { facingMode: "environment" }, 
+  config,
+  (text) => { 
+    // Bloqueamos lecturas repetidas por 2 segundos para que no se trabe
+    html5QrCode.pause(); 
+    enviarDatos(text);
+    setTimeout(() => html5QrCode.resume(), 2000); 
+  }
+);
   }
 
 function enviarDatos(codigo) {
   const status = document.getElementById('status');
   let idLimpio = codigo;
 
-  // Limpieza de ID
+  // 1. LIMPIEZA DE ID (Exactamente como la tenías)
   if (codigo.includes("id=")) {
     const urlParams = new URLSearchParams(codigo.split('?')[1]);
     idLimpio = urlParams.get("id");
@@ -95,15 +93,22 @@ function enviarDatos(codigo) {
   status.innerText = "⌛ Buscando estudiante...";
   status.style.background = "#fff9c4";
 
+  // 2. OPTIMIZACIÓN DE VELOCIDAD:
+  // Usamos 'keepalive' para que la conexión no se cierre y sea más rápida
   fetch(URL_SERVIDOR_VEGO, {
     method: "POST",
+    mode: "cors", // Cambiado a cors para asegurar que el JSON de vuelta llegue rápido
+    keepalive: true, 
     body: JSON.stringify({ id: idLimpio })
   })
-  .then(response => response.json()) // <--- AQUÍ RECIBIMOS EL NOMBRE
+  .then(response => response.json()) 
   .then(data => {
     if (data.status === "ok") {
       status.style.background = "#c8e6c9";
-      status.innerText = "✅ ESTUDIANTE: " + data.nombre; // <--- MUESTRA EL NOMBRE
+      status.innerText = "✅ ESTUDIANTE: " + data.nombre; 
+      
+      // REPRODUCIR SONIDO (Opcional, hace que se sienta más rápido)
+      window.navigator.vibrate(100); 
     } else {
       status.style.background = "#ffcdd2";
       status.innerText = "❌ ID NO ENCONTRADO (" + idLimpio + ")";
@@ -112,15 +117,13 @@ function enviarDatos(codigo) {
     setTimeout(() => { 
       status.innerText = "Esperando lectura..."; 
       status.style.background = "#eee";
-    }, 3000);
+    }, 2000); // Reducido a 2 segundos para agilizar el flujo
   })
   .catch(err => {
-    // Si hay error de conexión o el modo no-cors bloquea la respuesta, 
-    // al menos mostramos el ID para saber que leyó algo.
+    // Si falla el internet, al menos confirmamos que la cámara leyó bien
     status.innerText = "✅ ID LEÍDO: " + idLimpio; 
   });
 }
-
   function registrarFisico() {
     const input = document.getElementById('txtFisico');
     if(input.value.trim() !== "") {
