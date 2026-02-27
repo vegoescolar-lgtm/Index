@@ -82,36 +82,44 @@
     });
   }
 
-  function enviarDatos(codigo) {
-    const status = document.getElementById('status');
-    let idLimpio = codigo;
+function enviarDatos(codigo) {
+  const status = document.getElementById('status');
+  let idLimpio = codigo;
 
-    // Si el QR tiene la URL larga (como en tu foto), extraemos solo el ID
-    if (codigo.includes("id=")) {
-      const urlParams = new URLSearchParams(codigo.split('?')[1]);
-      idLimpio = urlParams.get("id");
-    }
-
-    status.innerText = "⌛ Registrando ID: " + idLimpio;
-    status.style.background = "#fff9c4";
-
-    fetch(URL_SERVIDOR_VEGO, {
-      method: "POST",
-      mode: "no-cors", 
-      body: JSON.stringify({ id: idLimpio })
-    })
-    .then(() => {
-      status.style.background = "#c8e6c9";
-      status.innerText = "✅ REGISTRADO: " + idLimpio;
-      setTimeout(() => { 
-        status.innerText = "Esperando lectura..."; 
-        status.style.background = "#eee";
-      }, 3000);
-    })
-    .catch(err => {
-      status.innerText = "❌ Error de conexión";
-    });
+  // Limpieza de ID
+  if (codigo.includes("id=")) {
+    const urlParams = new URLSearchParams(codigo.split('?')[1]);
+    idLimpio = urlParams.get("id");
   }
+
+  status.innerText = "⌛ Buscando estudiante...";
+  status.style.background = "#fff9c4";
+
+  fetch(URL_SERVIDOR_VEGO, {
+    method: "POST",
+    body: JSON.stringify({ id: idLimpio })
+  })
+  .then(response => response.json()) // <--- AQUÍ RECIBIMOS EL NOMBRE
+  .then(data => {
+    if (data.status === "ok") {
+      status.style.background = "#c8e6c9";
+      status.innerText = "✅ ESTUDIANTE: " + data.nombre; // <--- MUESTRA EL NOMBRE
+    } else {
+      status.style.background = "#ffcdd2";
+      status.innerText = "❌ ID NO ENCONTRADO (" + idLimpio + ")";
+    }
+    
+    setTimeout(() => { 
+      status.innerText = "Esperando lectura..."; 
+      status.style.background = "#eee";
+    }, 3000);
+  })
+  .catch(err => {
+    // Si hay error de conexión o el modo no-cors bloquea la respuesta, 
+    // al menos mostramos el ID para saber que leyó algo.
+    status.innerText = "✅ ID LEÍDO: " + idLimpio; 
+  });
+}
 
   function registrarFisico() {
     const input = document.getElementById('txtFisico');
