@@ -79,6 +79,21 @@ html5QrCode.start(
   }
 );
   }
+// --- ESTO SE AGREGA ARRIBA DE TU FUNCIÓN PARA CAPTURAR EL CORREO ---
+let usuarioVego = localStorage.getItem("vego_user");
+if (!usuarioVego) {
+  usuarioVego = prompt("SISTEMA VEGO: Ingrese su nombre o correo para registrar quién escanea:", "");
+  if (usuarioVego) localStorage.setItem("vego_user", usuarioVego);
+  else usuarioVego = "Usuario-Externo";
+}
+
+// --- ESTO SE AGREGA ARRIBA DE TU FUNCIÓN PARA CAPTURAR EL CORREO ---
+let usuarioVego = localStorage.getItem("vego_user");
+if (!usuarioVego) {
+  usuarioVego = prompt("SISTEMA VEGO: Ingrese su nombre o correo para registrar quién escanea:", "");
+  if (usuarioVego) localStorage.setItem("vego_user", usuarioVego);
+  else usuarioVego = "Usuario-Externo";
+}
 
 function enviarDatos(codigo) {
   const status = document.getElementById('status');
@@ -94,20 +109,20 @@ function enviarDatos(codigo) {
   status.style.background = "#fff9c4";
 
   // 2. OPTIMIZACIÓN DE VELOCIDAD:
-  // Usamos 'keepalive' para que la conexión no se cierre y sea más rápida
   fetch(URL_SERVIDOR_VEGO, {
     method: "POST",
-    mode: "cors", // Cambiado a cors para asegurar que el JSON de vuelta llegue rápido
+    mode: "cors", 
     keepalive: true, 
-    body: JSON.stringify({ id: idLimpio })
+    body: JSON.stringify({ 
+      id: idLimpio, 
+      usuario: usuarioVego // <--- UNICA ADICIÓN: Enviamos el nombre guardado
+    })
   })
   .then(response => response.json()) 
   .then(data => {
     if (data.status === "ok") {
       status.style.background = "#c8e6c9";
       status.innerText = "✅ ESTUDIANTE: " + data.nombre; 
-      
-      // REPRODUCIR SONIDO (Opcional, hace que se sienta más rápido)
       window.navigator.vibrate(100); 
     } else {
       status.style.background = "#ffcdd2";
@@ -117,10 +132,9 @@ function enviarDatos(codigo) {
     setTimeout(() => { 
       status.innerText = "Esperando lectura..."; 
       status.style.background = "#eee";
-    }, 2000); // Reducido a 2 segundos para agilizar el flujo
+    }, 2000);
   })
   .catch(err => {
-    // Si falla el internet, al menos confirmamos que la cámara leyó bien
     status.innerText = "✅ ID LEÍDO: " + idLimpio; 
   });
 }
