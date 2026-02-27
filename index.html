@@ -44,7 +44,7 @@
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <script>
-  const URL_SERVIDOR_VEGO = "https://script.google.com/macros/s/AKfycbxezJ4UMuJh2Bbz2jRW2UsJOqpi5O4doAZOASmoKjxjVwvAVmkVNNhhvyPs7do4jHkE1Q/exec"; 
+  const URL_SERVIDOR_VEGO = "https://script.google.com/macros/s/AKfycbyK0k66z-2mCCNqiCxbEYnpkK_6lTXlX34QsQzVpDATSS0cIUxRttr6oWl8A88bwOOiIg/exec"; 
   let html5QrCode = null;
   let usuarioVego = "";
 
@@ -77,26 +77,38 @@
   };
 
   // 2. FUNCIÓN PARA INICIAR LA CÁMARA
-  async function iniciarEscaneo() {
-    const btn = document.getElementById('btnCamara');
-    const status = document.getElementById('status');
-    
-    try {
-      html5QrCode = new Html5Qrcode("reader");
-      const config = { fps: 20, qrbox: { width: 250, height: 250 } };
+// MODIFICA SOLO LA FUNCIÓN DE INICIO DE CÁMARA
+async function iniciarEscaneo() {
+  const btn = document.getElementById('btnCamara');
+  const status = document.getElementById('status');
+  
+  try {
+    html5QrCode = new Html5Qrcode("reader");
+    // CONFIGURACIÓN ULTRA RÁPIDA
+    const config = { 
+      fps: 30, // Más cuadros para capturar códigos en movimiento
+      qrbox: { width: 220, height: 220 }, // Área optimizada
+      aspectRatio: 1.0,
+      disableFlip: true // Ahorra procesamiento
+    };
 
-      await html5QrCode.start(
-        { facingMode: "environment" }, 
-        config,
-        (text) => { enviarDatos(text); }
-      );
-      
-      btn.style.display = "none";
-      status.innerText = "✅ Cámara lista";
-    } catch (err) {
-      alert("Error al abrir cámara: " + err);
-    }
+    await html5QrCode.start(
+      { facingMode: "environment" }, 
+      config,
+      (text) => { 
+        // Pausamos el escáner un segundo para que el usuario vea el resultado
+        html5QrCode.pause(true); 
+        enviarDatos(text);
+        setTimeout(() => html5QrCode.resume(), 1500); 
+      }
+    );
+    
+    btn.style.display = "none";
+    status.innerText = "✅ Escáner de Alto Rendimiento";
+  } catch (err) {
+    alert("Error: " + err);
   }
+}
 
   // 3. FUNCIÓN DE ENVÍO
   function enviarDatos(codigo) {
