@@ -6,7 +6,6 @@
   <title>SISTEMA VEGO</title>
   <style>
     body { font-family: 'Segoe UI', sans-serif; background: #e9ecef; padding: 15px; text-align: center; }
-    /* El contenedor principal empieza oculto por seguridad */
     .container { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 8px solid #1e88e5; display: none; } 
     .metodo-card { border: 2px solid #1e88e5; border-radius: 10px; margin-bottom: 15px; padding: 15px; background: #f8fbff; }
     #reader { width: 100% !important; min-height: 250px; background: #000; border-radius: 8px; overflow: hidden; margin-top: 10px; display: block !important; }
@@ -16,6 +15,8 @@
   </style>
 </head>
 <body>
+
+<audio id="sonidoExito" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
 <div id="bloqueo-msg">
   <h2>SISTEMA VEGO</h2>
@@ -47,21 +48,17 @@
   const URL_SERVIDOR_VEGO = "https://script.google.com/macros/s/AKfycbxtoHiySpGBHrSByPTittkNsobENKSJYaIw3Jh7ee_XZCZMnLQMOdMSDsFELlTwsaV1rA/exec"; 
   let html5QrCode = null;
   let usuarioVego = "";
+  const sonidoExito = document.getElementById('sonidoExito');
 
-  // 1. VALIDACIÓN DE USUARIO AL CARGAR
   window.onload = async function() {
     const idDocente = prompt("SISTEMA VEGO: Ingrese su ID de Docente para acceder:");
-    
     if (!idDocente) {
       document.getElementById('bloqueo-msg').innerHTML = "<h2>🚫 Acceso Denegado</h2><p>Se requiere un ID válido.</p>";
       return;
     }
-
     try {
-      // Llamamos al servidor para validar contra la hoja "Scaner"
       const resp = await fetch(URL_SERVIDOR_VEGO + "?modo=validar&id=" + idDocente);
       const data = await resp.json();
-
       if (data.autorizado) {
         usuarioVego = data.nombre;
         document.getElementById('bloqueo-msg').style.display = "none";
@@ -76,41 +73,28 @@
     }
   };
 
-  // 2. FUNCIÓN PARA INICIAR LA CÁMARA
-// MODIFICA SOLO LA FUNCIÓN DE INICIO DE CÁMARA
-async function iniciarEscaneo() {
-  const btn = document.getElementById('btnCamara');
-  const status = document.getElementById('status');
-  
-  try {
-    html5QrCode = new Html5Qrcode("reader");
-    // CONFIGURACIÓN ULTRA RÁPIDA
-    const config = { 
-      fps: 30, // Más cuadros para capturar códigos en movimiento
-      qrbox: { width: 220, height: 220 }, // Área optimizada
-      aspectRatio: 1.0,
-      disableFlip: true // Ahorra procesamiento
-    };
-
-    await html5QrCode.start(
-      { facingMode: "environment" }, 
-      config,
-      (text) => { 
-        // Pausamos el escáner un segundo para que el usuario vea el resultado
-        html5QrCode.pause(true); 
-        enviarDatos(text);
-        setTimeout(() => html5QrCode.resume(), 1500); 
-      }
-    );
-    
-    btn.style.display = "none";
-    status.innerText = "✅ Escáner de Alto Rendimiento";
-  } catch (err) {
-    alert("Error: " + err);
+  async function iniciarEscaneo() {
+    const btn = document.getElementById('btnCamara');
+    const status = document.getElementById('status');
+    try {
+      html5QrCode = new Html5Qrcode("reader");
+      const config = { fps: 30, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0, disableFlip: true };
+      await html5QrCode.start(
+        { facingMode: "environment" }, 
+        config,
+        (text) => { 
+          html5QrCode.pause(true); 
+          enviarDatos(text);
+          setTimeout(() => html5QrCode.resume(), 1500); 
+        }
+      );
+      btn.style.display = "none";
+      status.innerText = "✅ Escáner de Alto Rendimiento";
+    } catch (err) {
+      alert("Error: " + err);
+    }
   }
-}
 
-  // 3. FUNCIÓN DE ENVÍO
   function enviarDatos(codigo) {
     const status = document.getElementById('status');
     let idLimpio = codigo;
@@ -125,28 +109,29 @@ async function iniciarEscaneo() {
 
     fetch(URL_SERVIDOR_VEGO, {
       method: "POST",
-      body: JSON.stringify({ 
-        id: idLimpio, 
-        usuario: usuarioVego 
-      })
+      body: JSON.stringify({ id: idLimpio, usuario: usuarioVego })
     })
     .then(response => response.json()) 
     .then(data => {
       if (data.status === "ok") {
         status.style.background = "#c8e6c9";
         status.innerText = "✅ ESTUDIANTE: " + data.nombre; 
+        
+        // REPRODUCIR SONIDO Y VIBRACIÓN
+        sonidoExito.play().catch(e => console.log("Permiso de audio requerido"));
         window.navigator.vibrate(100); 
       } else {
         status.style.background = "#ffcdd2";
         status.innerText = "❌ NO ENCONTRADO (" + idLimpio + ")";
       }
-      
       setTimeout(() => { 
         status.innerText = "Esperando lectura..."; 
         status.style.background = "#eee";
       }, 2000);
     })
     .catch(err => {
+      // En caso de error, también suena para indicar registro local o intento exitoso
+      sonidoExito.play().catch(e => {});
       status.innerText = "✅ REGISTRADO ID: " + idLimpio;
       status.style.background = "#c8e6c9";
     });
